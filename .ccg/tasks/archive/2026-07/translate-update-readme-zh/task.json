@@ -1,0 +1,12 @@
+{
+  "id": "translate-update-readme-zh",
+  "title": "检查并将 README 更新为中文",
+  "status": "completed",
+  "complexity": "S",
+  "risk": "low",
+  "domain": "docs",
+  "currentPhase": "completed",
+  "nextAction": "无（已完成）",
+  "createdAt": "2026-07-14T13:38:58Z",
+  "branch": "master"
+}
