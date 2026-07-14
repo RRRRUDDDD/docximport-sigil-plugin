@@ -98,6 +98,8 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
         is_small_caps = read_boolean_element(properties.find_child("w:smallCaps"))
         
         def add_complex_field_hyperlink(children):
+            if ruby_base_depth[0] > 0:
+                return children
             hyperlink_href = current_hyperlink_href()
             if hyperlink_href is None:
                 return children
@@ -167,6 +169,7 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
         return _read_style(properties, "w:pStyle", "Paragraph", styles.find_paragraph_style_by_id)
     
     complex_field_stack = []
+    ruby_base_depth = [0]
     
     def current_hyperlink_href():
         for state in reversed(complex_field_stack):
@@ -186,16 +189,22 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
         if fld_char_type == "begin":
             complex_field_stack.append(_ComplexFieldState())
         elif fld_char_type == "end" and complex_field_stack:
-            complex_field_stack.pop()
+            state = complex_field_stack.pop()
+            if not state.is_result:
+                return read_complex_field(state)
         elif fld_char_type == "separate" and complex_field_stack:
             state = complex_field_stack[-1]
-            state.field = parse_complex_field_code("".join(state.instruction))
             state.is_result = True
-            if isinstance(state.field, complex_fields.Ruby):
-                return _success(documents.ruby(
-                    base_text=state.field.base_text,
-                    annotation=state.field.annotation,
-                ))
+            return read_complex_field(state)
+        return _empty_result
+
+    def read_complex_field(state):
+        state.field = parse_complex_field_code("".join(state.instruction))
+        if isinstance(state.field, complex_fields.Ruby):
+            return _success(documents.ruby(
+                base_text=state.field.base_text,
+                annotation=state.field.annotation,
+            ))
         return _empty_result
 
     def parse_complex_field_code(instr_text):
@@ -228,6 +237,34 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
         return _success(documents.ruby(
             base_text=field.base_text,
             annotation=field.annotation,
+        ))
+
+    def read_ruby(element):
+        annotation_element = element.find_child("w:rt")
+        base_element = element.find_child("w:rubyBase")
+        if base_element is None:
+            return _empty_result_with_message(results.warning(
+                "A w:ruby element without w:rubyBase was ignored"
+            ))
+
+        ruby_base_depth[0] += 1
+        try:
+            base_result = _read_xml_elements(base_element.children)
+        finally:
+            ruby_base_depth[0] -= 1
+        annotation = _inner_text(annotation_element) if annotation_element is not None else ""
+        if not annotation:
+            return _ReadResult(
+                base_result.elements,
+                base_result.extra,
+                base_result.messages + [results.warning(
+                    "A w:ruby element without annotation was read as base text"
+                )],
+            )
+
+        return base_result.map(lambda children: documents.Ruby(
+            children=children,
+            annotation=annotation,
         ))
     
     def _read_style(properties, style_tag_name, style_type, find_style_by_id):
@@ -518,6 +555,7 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
         "w:fldChar": read_fld_char,
         "w:instrText": read_instr_text,
         "w:fldSimple": read_simple_field,
+        "w:ruby": read_ruby,
         "w:tab": tab,
         "w:noBreakHyphen": no_break_hyphen,
         "w:tbl": table,

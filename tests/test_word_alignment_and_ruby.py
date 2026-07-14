@@ -32,6 +32,14 @@ def _instruction(value):
     return element("w:instrText", children=[text(value)])
 
 
+def _native_ruby(base_children, annotation):
+    return element("w:ruby", children=[
+        element("w:rubyPr"),
+        element("w:rt", children=[_text_run(annotation)]),
+        element("w:rubyBase", children=list(base_children)),
+    ])
+
+
 def _convert_paragraph(children, properties=None, word_styles=None):
     paragraph_children = []
     if properties is not None:
@@ -170,6 +178,21 @@ class RubyFieldTests(unittest.TestCase):
             html,
         )
 
+    def test_native_ruby_in_a_complex_hyperlink_keeps_one_link(self):
+        html = _convert_paragraph([
+            _run(_field_char("begin")),
+            _run(_instruction(r' HYPERLINK "https://example.com" ')),
+            _run(_field_char("separate")),
+            _run(_native_ruby([_text_run("漢")], "かん")),
+            _run(_field_char("end")),
+        ])
+
+        self.assertEqual(
+            '<p><a href="https://example.com"><ruby>漢<rt>かん</rt>'
+            '</ruby></a></p>',
+            html,
+        )
+
     def test_non_ruby_complex_field_keeps_displayed_result(self):
         html = _convert_paragraph([
             _run(_field_char("begin")),
@@ -194,6 +217,57 @@ class RubyFieldTests(unittest.TestCase):
 
 
 class SuperscriptAndFontSizeTests(unittest.TestCase):
+    def test_unseparated_eq_fields_and_native_ruby_keep_emphasised_text(self):
+        def eq_emphasis(base_text):
+            return [
+                _run(_field_char("begin")),
+                _run(_instruction(
+                    r'EQ \* jc0 \* "Font:宋体" \* hps16 '
+                    r'\o(\s\up 9(•),{0})'.format(base_text)
+                )),
+                _run(_field_char("end")),
+            ]
+
+        children = [_text_run("我竟然真的体会到了那")]
+        children.extend(eq_emphasis("无"))
+        children.extend([
+            _run(_native_ruby([_text_run("法")], "•")),
+            _run(_native_ruby([_text_run("想")], "•")),
+        ])
+        children.extend(eq_emphasis("象"))
+        children.extend([
+            _run(_native_ruby([_text_run("的")], "•")),
+            _run(_native_ruby([_text_run("初")], "•")),
+            _run(_native_ruby([_text_run("恋")], "•")),
+            _text_run("。"),
+        ])
+
+        html = _convert_paragraph(children)
+
+        self.assertEqual(
+            '<p>我竟然真的体会到了那'
+            '<ruby>无<rt>•</rt></ruby>'
+            '<ruby>法<rt>•</rt></ruby>'
+            '<ruby>想<rt>•</rt></ruby>'
+            '<ruby>象<rt>•</rt></ruby>'
+            '<ruby>的<rt>•</rt></ruby>'
+            '<ruby>初<rt>•</rt></ruby>'
+            '<ruby>恋<rt>•</rt></ruby>。</p>',
+            html,
+        )
+
+    def test_native_ruby_preserves_base_run_formatting(self):
+        html = _convert_paragraph([
+            _run(_native_ruby([
+                _formatted_text_run("法", element("w:b")),
+            ], "•")),
+        ])
+
+        self.assertEqual(
+            '<p><ruby><strong>法</strong><rt>•</rt></ruby></p>',
+            html,
+        )
+
     def test_superscript_and_following_text_are_preserved(self):
         html = _convert_paragraph([
             _text_run("平方"),
