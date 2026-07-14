@@ -1,6 +1,7 @@
 name: Build and Release DOCXImport plugin
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - master
