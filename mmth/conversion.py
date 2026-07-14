@@ -103,7 +103,39 @@ class _DocumentConverter(documents.element_visitor(args=1)):
                 return [html.force_write] + content
 
         html_path = self._find_html_path_for_paragraph(paragraph)
+        html_path = self._apply_paragraph_formatting(
+            html_path,
+            alignment=paragraph.alignment,
+            font_size=paragraph.font_size,
+        )
         return html_path.wrap(children)
+
+    def _apply_paragraph_formatting(self, html_path, alignment, font_size):
+        path_elements = getattr(html_path, "elements", None)
+        if not path_elements:
+            return html_path
+
+        declarations = []
+        if alignment in ["right", "end"]:
+            declarations.append("text-align: right")
+        if font_size is not None:
+            declarations.append("font-size: {0:g}pt".format(font_size))
+        if not declarations:
+            return html_path
+
+        elements = list(path_elements)
+        path_element = elements[-1]
+        attributes = dict(path_element.tag.attributes)
+        style = attributes.get("style", "").strip()
+        if style:
+            style = style.rstrip(";") + "; " + "; ".join(declarations)
+        else:
+            style = "; ".join(declarations)
+        attributes["style"] = style
+
+        tag = cobble.copy(path_element.tag, attributes=attributes)
+        elements[-1] = cobble.copy(path_element, tag=tag)
+        return html_paths.path(elements)
 
 
     def visit_run(self, run, context):
@@ -128,7 +160,14 @@ class _DocumentConverter(documents.element_visitor(args=1)):
         for path in paths:
             nodes = partial(path.wrap, nodes)
 
-        return nodes()
+        converted_nodes = nodes()
+        if run.font_size is None:
+            return converted_nodes
+
+        attributes = {
+            "style": "font-size: {0:g}pt".format(run.font_size),
+        }
+        return [html.collapsible_element("span", attributes, converted_nodes)]
 
 
     def _find_style_for_run_property(self, element_type, default=None):
@@ -143,6 +182,11 @@ class _DocumentConverter(documents.element_visitor(args=1)):
 
     def visit_text(self, text, context):
         return [html.text(text.value)]
+
+    def visit_ruby(self, ruby, context):
+        base_nodes = self._visit_all(ruby.children, context)
+        annotation = html.element("rt", {}, [html.text(ruby.annotation)])
+        return [html.element("ruby", {}, base_nodes + [annotation])]
 
 
     def visit_hyperlink(self, hyperlink, context):

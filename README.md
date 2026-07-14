@@ -1,159 +1,70 @@
-DOCXImport (A Sigil Plugin)
-============
+# DOCXImport（Sigil 插件）
 
-Import DOCX documents into Sigil as epubs
+将 DOCX 文档导入 Sigil，并转换为可继续编辑的 EPUB。
 
-A Sigil plugin based on the Python [Mammoth module](https://github.com/mwilliamson/python-mammoth).
+本插件基于 Python 版 [Mammoth](https://github.com/mwilliamson/python-mammoth)，转换目标是生成结构清晰、便于编辑的 HTML，而不是逐像素复刻 Word 的页面排版。
 
-**NOTE: this plugin periodically checks for updated versions by connecting to this Github repository**
-(this behavior can be change in the GUI)
+## 主要功能
 
-Links
-=====
+- 将 DOCX 转换为 EPUB2 或 EPUB3，并导入 Sigil。
+- 支持自定义 Mammoth 样式映射和自定义 CSS。
+- 保留常见的段落、标题、列表、表格、链接、图片、脚注及基础文字格式。
+- 识别 Word 的显式右对齐，并输出对应的 HTML/CSS 对齐样式。
+- 保留普通上标、下标及其前后正文。
+- 识别 Word 字号：
+  - 支持 run 中的 `w:sz` 和 `w:szCs`；
+  - 支持文档默认字号；
+  - 支持段落样式、字符样式及 `basedOn` 字号继承；
+  - Word 的半磅值会转换为 CSS `pt`。
+- 识别写在 Word 域中的 Ruby（拼音/注音），包括常见的 `EQ`、`\o`、`\o\ad`、`\o\ac`、`\o\al` 和 `\o\ar` 形式，并输出 HTML `ruby`/`rt` 标记。
 
-* Sigil website is at <http://sigil-ebook.com>
-* Sigil support forums are at <http://www.mobileread.com/forums/forumdisplay.php?f=203>
-* DOCXImport plugin MobileRead support thread: <http://www.mobileread.com/forums/showthread.php?t=273966>
+复杂页面布局、浮动形状、特殊公式和部分 Word 专有对象可能需要在导入后手工调整。
 
-Building
-========
+## 相关链接
 
-First, clone the repo:
+- [Sigil 官网](http://sigil-ebook.com)
+- [Sigil MobileRead 支持论坛](http://www.mobileread.com/forums/forumdisplay.php?f=203)
+- [DOCXImport MobileRead 支持主题](http://www.mobileread.com/forums/showthread.php?t=273966)
+- [Mammoth 样式映射文档](https://github.com/mwilliamson/python-mammoth#writing-style-maps)
 
-`$git clone https://github.com/dougmassay/docximport-sigil-plugin.git`
+## 运行要求
 
-To create the plugin zip file, run the buildplugin.py script (root of the repository tree) with Python (Python3-only)
+- Sigil 0.9.8 或更高版本。
+- Python 3；推荐使用 Sigil 自带的 Python 解释器。
+- 插件界面依赖 Qt。使用 Sigil 自带解释器时，Windows、macOS 和常见 Linux 发行版通常无需另行安装依赖。
+- 如果在 Linux 上使用外部 Python 环境，需要自行确保相应的 PyQt5 或 PySide6 组件可用。
 
-`$python buildplugin` (or just ./buildplugin if Python is in your path)
+> **注意：** 安装前不要重命名插件 ZIP 文件。
 
-This will create the DOCXImport_vX.X.X.zip file that can then be installed into Sigil's plugin manager.
+## 安装与使用
 
-`$python buildplugin -l` (or --language) to compile any language files (.ts) and the .qm files to the plugin (Qt's lrelease must be installed and on your PATH for this to work).
+1. 在 Sigil 中选择 **插件 > 管理插件**（**Plugins > Manage Plugins**）。
+2. 点击 **添加插件**（**Add Plugin**），选择构建或下载得到的 `DOCXImport_vX.X.X.zip`。
+3. 通过 **插件 > 输入 > DOCXImport**（**Plugins > Input > DOCXImport**）启动插件。
+4. 选择生成 EPUB2 或 EPUB3。
+5. 使用第一个 **...** 按钮选择 DOCX 文件。
+6. 如有需要，选择自定义样式映射文件和/或 CSS 文件。
+7. 点击 **确定** 开始转换。
 
-Using DOCXImport
-=================
-If you're using Sigil v0.9.0 or later on OSX or Windows, all dependencies should already be met so long as you're using the bundled Python interpreter (default).
+转换完成后得到的 EPUB 默认只有一个正文分区。如需拆分章节，可在 Sigil 中使用 **编辑 > 在光标处拆分**（**Edit > Split At Cursor**）或 **插入 > 拆分标记**（**Insert > Split Marker**）。
 
-Linux users will have to make sure that the Tk or PyQt5 graphical python module is present if it's not already.  On Debian-based flavors this can be done with "sudo apt-get install python3-tk" (or python3-pyqt5).
+仓库的 [`samples`](samples) 目录包含示例 DOCX、样式映射和 CSS 文件。
 
-* **Note:** Do not rename any Sigil plugin zip files before attempting to install them
+## 自定义样式映射与 CSS
 
-This plugin will work with either Python 3.4+.
-The absolute minimum version of Sigil required is v0.8.3 (Python must be installed separately prior to v0.9.0)
+样式映射用于将 Word 样式映射为指定的 HTML 元素或 class；CSS 用于控制导入 EPUB 后的显示效果。
 
-To use the plugin:
+可从以下示例开始修改：
 
-1. Install it: In Sigil, choose **Plugins > Manage Plugins**, then click **Add Plugin**, then navigate to the zip file for this plugin.
+- [`samples/sample_style_map.txt`](samples/sample_style_map.txt)
+- [`samples/sample_style_sheet.css`](samples/sample_style_sheet.css)
 
-2. Start the plugin by choosing **Plugins > Input > DocXImport**.
+样式映射语法请参阅 Mammoth 的 [Writing Style Maps](https://github.com/mwilliamson/python-mammoth#writing-style-maps) 文档。
 
-3. Select whether to generate EPUB2 or EPUB3.
+## 许可证
 
-4. Use the first **...** button to navigate to a DOCX file.
+- DOCXImport：GPLv3。
+- [Mammoth](https://github.com/mwilliamson/python-mammoth)：BSD 2-Clause License。
+- [Cobble](https://github.com/mwilliamson/python-cobble)：BSD 2-Clause License。
 
-5. Optionally, select a custom style map and/or custom CSS file.
-
-6. Click **OK**.
-
-The plugin runs, converting the DOCX file into an ePub. The resulting ePub has only one section; to
-break it up into multiple sections, use Sigil's **Edit > Split At Cursor** or
-**Insert > Split Marker** commands.
-
-For more help, see the DOCXImport plugin [MobileRead support thread](http://www.mobileread.com/forums/showthread.php?t=273966).
-
-A sample docx file (along with a sample mammoth style map and css file) are available in the samples folder of the github reppository. For more help with custom style maps, check out the "Writing Style Maps" section of the [Mammoth README.](https://github.com/mwilliamson/python-mammoth#writing-style-maps)
-
-
-Contributing / Modifying
-============
-From here on out, a proficiency with developing / creating Sigil plugins is assumed.
-If you need a crash-course, an introduction to creating Sigil plugins is available at
-http://www.mobileread.com/forums/showthread.php?t=251452.
-
-The core plugin files (this is where most contributors will spend their time) are:
-
-    > mmth (modified Mammoth module)
-    > cbbl (modified Cobble module)
-    > images (icon)
-    > gui_utilities.py
-    > htmlformat.py
-    > plugin.py
-    > plugin.xml
-    > qtdialogs.py
-    > quickepub.py
-    > tkdialogs.py
-    > updatecheck.py
-
-Files used for building/maintaining the plugin:
-
-    > buildplugin  -- this is used to build the plugin.
-    > setup.cfg -- used for flake8 style checking. Use it to see if your code complies.
-    > checkversion.xml -- used by automatic update checking (not yet implemented).
-
-
-Feel free to fork the repository and submit pull requests (or just use it privately to experiment).
-
-Would you like to contribute to the translating of DOCXImport? Copy the base.ts file from the translation folder, rename it to 'docximport_(your_locale).ts' (ex. docximport_fr.ts for French) and complete it with Qt's Linguist program. Use a pull requet with the completed ts file added to get it into the official releases.
-
-
-
-License Information
-=======
-
-### DOCXImport (this plugin)
-
-    Released under the GPLv3.
-
-### [Mammoth](https://github.com/mwilliamson/python-mammoth) - "Convert Word documents to simple and clean HTML"
-
-Released under the 2-Clause BSD License
-
-Copyright (c) 2013, Michael Williamson
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-### [Cobble](https://github.com/mwilliamson/python-cobble) - "Create Python data objects"
-
-Released under the 2-Clause BSD License
-
-Copyright (c) 2013, Michael Williamson
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
-ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+完整许可证原文请参阅根目录的 [`LICENSE`](LICENSE)、[`mmth/LICENSE`](mmth/LICENSE) 和 [`cbbl/LICENSE`](cbbl/LICENSE)。

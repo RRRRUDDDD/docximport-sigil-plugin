@@ -39,7 +39,6 @@ class ImageWriter(object):
         self._image_number = 1
 
     def __call__(self, element):
-        global img_map
         print("processing an image")
         if element.content_type in _img_extensions:
             extension = _img_extensions.get(element.content_type)
@@ -73,7 +72,6 @@ def make_temp_directory():
 
 def run(bk):
     global prefs
-    global img_map
     global _DEBUG_
 
     # Use Qt interface if Sigil >= v0.9.8

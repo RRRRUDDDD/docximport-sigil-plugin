@@ -1,98 +1,92 @@
-
 name: Build and Release DOCXImport plugin
 
 on:
   push:
-    tags:
-      - 'v*'
     branches:
       - master
+    tags:
+      - "v*"
   pull_request:
     branches:
       - master
+
+permissions:
+  contents: read
+
 env:
-  PLUGIN_NAME: "DOCXImport"
+  PLUGIN_NAME: DOCXImport
+  PYTHON_VERSION: "3.11"
+  QT_VERSION: "5.15.2"
 
 jobs:
   build:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v7
 
-    - name: Get tag name
-      if: startswith( github.ref, 'refs/tags/')
-      id: get_tag_name
-      run: echo "TAGNAME=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
 
-    - name: Set up Python 3.8
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.8
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install flake8 PyQt5==5.15.11
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8
-        pip install PyQt5==5.12.3
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          setup-python: "false"
+          cache: "true"
+          cache-key-prefix: docximport-qt-${{ hashFiles('.github/workflows/reset-caches.txt') }}
 
-    - name: Lint with flake8
-      run: |
-        flake8 buildplugin
-        flake8 .
+      - name: Lint
+        run: python -m flake8 .
 
-    - name: Update language files
-      run: |
-        pylupdate5 -verbose -translate-function _t *.py -ts ./translations/template.ts
-  
-    - name: Commit any language TS files updated
-      uses: stefanzweifel/git-auto-commit-action@v5
-      with:
-        commit_user_name: GitHub Actions Bot
-        commit_user_email: actions-bot@example.org
-        commit_author: Doug Massay <dougmassay@users.noreply.github.com>
-        commit_message: Update TS files with 5.12 lupdate [skip ci]
+      - name: Run tests
+        run: |
+          python -m unittest discover -v
+          python -m compileall -q mmth tests
 
-    - name: Cache Qt
-      id: cache-qt
-      uses: actions/cache@v4
-      with:
-        path: ${{runner.workspace}}/Qt
-        key: ${{ runner.os }}-qttools-${{ hashFiles('**/reset-caches.txt') }}
-  
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '5.12.3'
-        dir: ${{runner.workspace}}/Qt
-        setup-python: 'false'
-        archives: 'qtbase qttools icu'
-        cache: ${{ steps.cache-qt.outputs.cache-hit }}
+      - name: Validate translation extraction
+        run: pylupdate5 -verbose -translate-function _t ./*.py -ts /tmp/docximport-template.ts
 
-    - name: Build Plugin
-      run: |
-        python buildplugin --language
+      - name: Build plugin
+        run: python buildplugin --language
 
-    - name: Upload Artifact
-      if: "contains(github.event.head_commit.message, '[deploy]')"
-      uses: actions/upload-artifact@v4
-      with:
-        name: docximport-artifact
-        path: ./*.zip
-        retention-days: 3
+      - name: Upload plugin package
+        uses: actions/upload-artifact@v7
+        with:
+          name: docximport-package
+          path: ./DOCXImport_v*.zip
+          if-no-files-found: error
+          retention-days: 3
 
-    - name: Create Release
-      if: startswith( github.ref, 'refs/tags/')
-      uses: ncipollo/release-action@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        name: ${{ env.PLUGIN_NAME }} ${{ steps.get_tag_name.outputs.TAGNAME }}
-        body: |
-          Changes in this Release
-          - First Change
-          - Second Change
-        draft: true
-        prerelease: false
-        artifacts: './*.zip'
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download plugin package
+        uses: actions/download-artifact@v8
+        with:
+          name: docximport-package
+          path: dist
+
+      - name: Create draft release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ env.PLUGIN_NAME }} ${{ github.ref_name }}
+          artifacts: "dist/*.zip"
+          generateReleaseNotes: true
+          draft: true
+          prerelease: false

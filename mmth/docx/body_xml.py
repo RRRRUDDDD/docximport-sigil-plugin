@@ -47,6 +47,13 @@ class _BodyReader(object):
         return results.Result(result.elements, result.messages)
 
 
+class _ComplexFieldState(object):
+    def __init__(self):
+        self.field = complex_fields.unknown
+        self.instruction = []
+        self.is_result = False
+
+
 def _create_reader(numbering, content_types, relationships, styles, docx_file, files):
     _ignored_elements = set([
         "office-word:wrap",
@@ -79,6 +86,10 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
             .find_child_or_null("w:vertAlign") \
             .attributes.get("w:val")
         font = properties.find_child_or_null("w:rFonts").attributes.get("w:ascii")
+        font_size = _read_font_size(properties)
+        run_style_id = properties.find_child_or_null("w:rStyle").attributes.get("w:val")
+        if font_size is None and run_style_id is not None:
+            font_size = styles.find_character_style_font_size_by_id(run_style_id)
         
         is_bold = read_boolean_element(properties.find_child("w:b"))
         is_italic = read_boolean_element(properties.find_child("w:i"))
@@ -107,6 +118,7 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
                 is_small_caps=is_small_caps,
                 vertical_alignment=vertical_alignment,
                 font=font,
+                font_size=font_size,
             ))
     
     def _read_run_style(properties):
@@ -115,12 +127,28 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
     def read_boolean_element(element):
         return element and element.attributes.get("w:val") not in ["false", "0"]
 
+    def _read_font_size(properties):
+        for element_name in ["w:sz", "w:szCs"]:
+            value = properties.find_child_or_null(element_name).attributes.get("w:val")
+            try:
+                half_points = int(value)
+            except (TypeError, ValueError):
+                continue
+            if half_points > 0:
+                return half_points / 2.0
+
+        return None
+
 
     def paragraph(element):
         properties = element.find_child_or_null("w:pPr")
         alignment = properties.find_child_or_null("w:jc").attributes.get("w:val")
         numbering = _read_numbering_properties(properties.find_child_or_null("w:numPr"))
         indent = _read_paragraph_indent(properties.find_child_or_null("w:ind"))
+        paragraph_style_id = properties.find_child_or_null("w:pStyle").attributes.get("w:val")
+        font_size = _read_font_size(properties.find_child_or_null("w:rPr"))
+        if font_size is None:
+            font_size = styles.find_paragraph_style_font_size_by_id(paragraph_style_id)
         
         return _ReadResult.map_results(
             _read_paragraph_style(properties),
@@ -132,38 +160,54 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
                 numbering=numbering,
                 alignment=alignment,
                 indent=indent,
+                font_size=font_size,
             )).append_extra()
     
     def _read_paragraph_style(properties):
         return _read_style(properties, "w:pStyle", "Paragraph", styles.find_paragraph_style_by_id)
     
-    current_instr_text = []
     complex_field_stack = []
     
     def current_hyperlink_href():
-        for complex_field in reversed(complex_field_stack):
-            if isinstance(complex_field, complex_fields.Hyperlink):
-                return complex_field.href
+        for state in reversed(complex_field_stack):
+            if isinstance(state.field, complex_fields.Hyperlink):
+                return state.field.href
 
         return None
+
+    def is_in_ruby_result():
+        return any(
+            state.is_result and isinstance(state.field, complex_fields.Ruby)
+            for state in complex_field_stack
+        )
     
     def read_fld_char(element):
         fld_char_type = element.attributes.get("w:fldCharType")
         if fld_char_type == "begin":
-            complex_field_stack.append(complex_fields.unknown)
-            del current_instr_text[:]
-        elif fld_char_type == "end":
+            complex_field_stack.append(_ComplexFieldState())
+        elif fld_char_type == "end" and complex_field_stack:
             complex_field_stack.pop()
-        elif fld_char_type == "separate":
-            instr_text = "".join(current_instr_text)
-            hyperlink_href = parse_hyperlink_field_code(instr_text)
-            if hyperlink_href is None:
-                complex_field = complex_fields.unknown
-            else:
-                complex_field = complex_fields.hyperlink(hyperlink_href)
-            complex_field_stack.pop()
-            complex_field_stack.append(complex_field)
+        elif fld_char_type == "separate" and complex_field_stack:
+            state = complex_field_stack[-1]
+            state.field = parse_complex_field_code("".join(state.instruction))
+            state.is_result = True
+            if isinstance(state.field, complex_fields.Ruby):
+                return _success(documents.ruby(
+                    base_text=state.field.base_text,
+                    annotation=state.field.annotation,
+                ))
         return _empty_result
+
+    def parse_complex_field_code(instr_text):
+        ruby = complex_fields.parse_ruby_field_code(instr_text)
+        if ruby is not None:
+            return ruby
+
+        hyperlink_href = parse_hyperlink_field_code(instr_text)
+        if hyperlink_href is not None:
+            return complex_fields.hyperlink(hyperlink_href)
+
+        return complex_fields.unknown
     
     def parse_hyperlink_field_code(instr_text):
         result = re.match(r'\s*HYPERLINK "(.*)"', instr_text)
@@ -173,8 +217,18 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
             return result.group(1)
     
     def read_instr_text(element):
-        current_instr_text.append(_inner_text(element))
+        if complex_field_stack and not complex_field_stack[-1].is_result:
+            complex_field_stack[-1].instruction.append(_inner_text(element))
         return _empty_result
+
+    def read_simple_field(element):
+        field = complex_fields.parse_ruby_field_code(element.attributes.get("w:instr"))
+        if field is None:
+            return read_child_elements(element)
+        return _success(documents.ruby(
+            base_text=field.base_text,
+            annotation=field.annotation,
+        ))
     
     def _read_style(properties, style_tag_name, style_type, find_style_by_id):
         messages = []
@@ -463,6 +517,7 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
         "w:p": paragraph,
         "w:fldChar": read_fld_char,
         "w:instrText": read_instr_text,
+        "w:fldSimple": read_simple_field,
         "w:tab": tab,
         "w:noBreakHyphen": no_break_hyphen,
         "w:tbl": table,
@@ -493,6 +548,7 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
     }
     
     def read(element):
+        suppress_result = is_in_ruby_result()
         handler = handlers.get(element.name)
         if handler is None:
             if element.name not in _ignored_elements:
@@ -501,7 +557,11 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
             else:
                 return _empty_result
         else:
-            return handler(element)
+            result = handler(element)
+
+        if suppress_result:
+            return _ReadResult([], [], result.messages)
+        return result
         
 
     def _read_xml_elements(nodes):

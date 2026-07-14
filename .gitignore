@@ -22,10 +22,18 @@ pip-delete-this-directory.txt
 # Unit test / coverage reports
 htmlcov/
 .tox/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 .cache
 nosetests.xml
 coverage.xml
+
+# Local virtual environments
+.venv/
+venv/
 
 # Translations
 *.mo
@@ -40,6 +48,10 @@ target/
 
 # Temporary build directories
 docximport/
+/DOCXImport/
+
+# Local web research cache
+.firecrawl/
 
 # Zip files (plugin releases)
 *.zip

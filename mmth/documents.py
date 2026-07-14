@@ -22,6 +22,7 @@ class Paragraph(HasChildren):
     numbering = cobble.field()
     alignment = cobble.field()
     indent = cobble.field()
+    font_size = cobble.field(default=None)
 
 
 @cobble.data
@@ -51,10 +52,15 @@ class Run(HasChildren):
     is_small_caps = cobble.field()
     vertical_alignment = cobble.field()
     font = cobble.field()
+    font_size = cobble.field(default=None)
 
 @cobble.data
 class Text(Element):
     value = cobble.field()
+
+@cobble.data
+class Ruby(HasChildren):
+    annotation = cobble.field()
 
 @cobble.data
 class Hyperlink(HasChildren):
@@ -105,11 +111,19 @@ def document(children, notes=None, comments=None):
         comments = []
     return Document(children, notes, comments=comments)
 
-def paragraph(children, style_id=None, style_name=None, numbering=None, alignment=None, indent=None):
+def paragraph(children, style_id=None, style_name=None, numbering=None, alignment=None, indent=None, font_size=None):
     if indent is None:
         indent = paragraph_indent()
     
-    return Paragraph(children, style_id, style_name, numbering, alignment=alignment, indent=indent)
+    return Paragraph(
+        children,
+        style_id,
+        style_name,
+        numbering,
+        alignment=alignment,
+        indent=indent,
+        font_size=font_size,
+    )
 
 def paragraph_indent(start=None, end=None, first_line=None, hanging=None):
     return ParagraphIndent(start=start, end=end, first_line=first_line, hanging=hanging)
@@ -125,6 +139,7 @@ def run(
     is_small_caps=None,
     vertical_alignment=None,
     font=None,
+    font_size=None,
 ):
     if vertical_alignment is None:
         vertical_alignment = VerticalAlignment.baseline
@@ -139,6 +154,7 @@ def run(
         is_small_caps=bool(is_small_caps),
         vertical_alignment=vertical_alignment,
         font=font,
+        font_size=font_size,
     )
 
 class VerticalAlignment(object):
@@ -147,6 +163,9 @@ class VerticalAlignment(object):
     subscript = "subscript"
 
 text = Text
+
+def ruby(base_text, annotation):
+    return Ruby(children=[text(base_text)], annotation=annotation)
 
 _tab = Tab()
 

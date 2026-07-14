@@ -204,7 +204,6 @@ class App(QtWidgets.QWidget):
         btn.setEnabled(chk.isChecked())
 
     def cmdDo(self):
-        global _DETAILS
         self.prefs['qt_geometry'] = self.saveGeometry().toHex().data().decode('ascii')
         self.prefs['check_for_updates'] = self.checkbox_get_updates.isChecked()
         self.prefs['epub_version'] = self.epubType.checkedButton().text()[-1] + '.0'
