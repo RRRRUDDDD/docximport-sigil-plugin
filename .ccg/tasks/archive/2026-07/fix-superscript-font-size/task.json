@@ -1,0 +1,12 @@
+{
+  "id": "fix-superscript-font-size",
+  "title": "修复上标文本丢失并支持 Word 字号",
+  "status": "completed",
+  "complexity": "M",
+  "risk": "medium",
+  "domain": "backend",
+  "currentPhase": "completed",
+  "nextAction": "无（已完成）",
+  "createdAt": "2026-07-14T13:25:31Z",
+  "branch": "master"
+}
