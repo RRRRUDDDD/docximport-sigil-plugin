@@ -217,6 +217,82 @@ class RubyFieldTests(unittest.TestCase):
 
 
 class SuperscriptAndFontSizeTests(unittest.TestCase):
+    def test_matching_paragraph_and_run_font_sizes_are_not_duplicated(self):
+        properties = element("w:pPr", children=[
+            element("w:rPr", children=[
+                element("w:sz", {"w:val": "44"}),
+            ]),
+        ])
+
+        html = _convert_paragraph([
+            _formatted_text_run("简介", element("w:sz", {"w:val": "44"})),
+        ], properties)
+
+        self.assertEqual(
+            '<p><span style="font-size: 22pt">简介</span></p>',
+            html,
+        )
+
+    def test_paragraph_font_size_is_kept_for_an_inheriting_run(self):
+        properties = element("w:pPr", children=[
+            element("w:rPr", children=[
+                element("w:sz", {"w:val": "44"}),
+            ]),
+        ])
+
+        html = _convert_paragraph([_text_run("继承字号")], properties)
+
+        self.assertEqual(
+            '<p style="font-size: 22pt">继承字号</p>',
+            html,
+        )
+
+    def test_paragraph_font_size_is_kept_for_a_different_run_size(self):
+        properties = element("w:pPr", children=[
+            element("w:rPr", children=[
+                element("w:sz", {"w:val": "44"}),
+            ]),
+        ])
+
+        html = _convert_paragraph([
+            _formatted_text_run("局部字号", element("w:sz", {"w:val": "48"})),
+        ], properties)
+
+        self.assertEqual(
+            '<p style="font-size: 22pt">'
+            '<span style="font-size: 24pt">局部字号</span></p>',
+            html,
+        )
+
+    def test_paragraph_font_size_is_kept_for_mixed_run_inheritance(self):
+        properties = element("w:pPr", children=[
+            element("w:rPr", children=[
+                element("w:sz", {"w:val": "44"}),
+            ]),
+        ])
+
+        html = _convert_paragraph([
+            _formatted_text_run("显式", element("w:sz", {"w:val": "44"})),
+            _text_run("继承"),
+        ], properties)
+
+        self.assertEqual(
+            '<p style="font-size: 22pt">'
+            '<span style="font-size: 22pt">显式</span>继承</p>',
+            html,
+        )
+
+    def test_paragraph_font_size_is_kept_for_an_empty_paragraph(self):
+        properties = element("w:pPr", children=[
+            element("w:rPr", children=[
+                element("w:sz", {"w:val": "44"}),
+            ]),
+        ])
+
+        html = _convert_paragraph([], properties)
+
+        self.assertEqual('<p style="font-size: 22pt"></p>', html)
+
     def test_unseparated_eq_fields_and_native_ruby_keep_emphasised_text(self):
         def eq_emphasis(base_text):
             return [

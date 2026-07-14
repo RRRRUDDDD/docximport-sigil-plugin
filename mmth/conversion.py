@@ -61,6 +61,66 @@ class _ConversionContext(object):
         return cobble.copy(self, **kwargs)
 
 
+def _paragraph_font_size(paragraph):
+    font_size = paragraph.font_size
+    if font_size is None:
+        return None
+
+    has_text, is_fully_covered = _font_size_coverage(
+        paragraph.children,
+        font_size,
+        is_covered=False,
+    )
+    if has_text and is_fully_covered:
+        return None
+    return font_size
+
+
+def _font_size_coverage(elements, font_size, is_covered):
+    has_text = False
+    is_fully_covered = True
+    for element in elements:
+        element_has_text, element_is_covered = _element_font_size_coverage(
+            element,
+            font_size,
+            is_covered,
+        )
+        if element_has_text:
+            has_text = True
+            is_fully_covered = is_fully_covered and element_is_covered
+    return has_text, is_fully_covered
+
+
+def _element_font_size_coverage(element, font_size, is_covered):
+    if isinstance(element, documents.Run):
+        if element.font_size is not None:
+            is_covered = element.font_size == font_size
+        return _font_size_coverage(element.children, font_size, is_covered)
+
+    if isinstance(element, documents.Text):
+        return True, is_covered
+
+    if isinstance(element, documents.Ruby):
+        _, base_is_covered = _font_size_coverage(
+            element.children,
+            font_size,
+            is_covered,
+        )
+        return True, is_covered and base_is_covered
+
+    if isinstance(element, documents.HasChildren):
+        return _font_size_coverage(element.children, font_size, is_covered)
+
+    if isinstance(element, (
+        documents.Tab,
+        documents.NoteReference,
+        documents.CommentReference,
+    )):
+        return True, is_covered
+
+    return False, True
+
+
 class _DocumentConverter(documents.element_visitor(args=1)):
     def __init__(self, messages, style_map, convert_image, id_prefix, ignore_empty_paragraphs, note_references, comments):
         self._messages = messages
@@ -106,7 +166,7 @@ class _DocumentConverter(documents.element_visitor(args=1)):
         html_path = self._apply_paragraph_formatting(
             html_path,
             alignment=paragraph.alignment,
-            font_size=paragraph.font_size,
+            font_size=_paragraph_font_size(paragraph),
         )
         return html_path.wrap(children)
 
