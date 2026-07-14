@@ -444,11 +444,7 @@ def _create_reader(numbering, content_types, relationships, styles, docx_file, f
 
 
     def bookmark_start(element):
-        name = element.attributes.get("w:name")
-        if name == "_GoBack":
-            return _empty_result
-        else:
-            return _success(documents.bookmark(name))
+        return _empty_result
     
     
     def break_(element):

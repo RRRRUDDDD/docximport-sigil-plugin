@@ -107,6 +107,20 @@ class WordAlignmentTests(unittest.TestCase):
         self.assertEqual("", html)
 
 
+class WordBookmarkTests(unittest.TestCase):
+    def test_word_bookmarks_are_filtered_without_losing_their_text(self):
+        html = _convert_paragraph([
+            element("w:bookmarkStart", {
+                "w:id": "1",
+                "w:name": "OLE_LINK5",
+            }),
+            _text_run("书签范围内的正文"),
+            element("w:bookmarkEnd", {"w:id": "1"}),
+        ])
+
+        self.assertEqual('<p>书签范围内的正文</p>', html)
+
+
 class RubyFieldTests(unittest.TestCase):
     def test_complex_eq_field_is_converted_to_ruby_and_fallback_is_suppressed(self):
         html = _convert_paragraph([

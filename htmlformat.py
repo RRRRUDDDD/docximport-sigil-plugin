@@ -25,8 +25,24 @@ HTML = textwrap.dedent('''<?xml version="1.0" encoding="utf-8"?>
 
 LINK_TEXT = '<link href="stylesheet.css" type="text/css" rel="stylesheet"/>'
 
+_BLANK_PARAGRAPH_PATTERN = (
+    r'<p(?:\s[^>]*)?>'
+    r'(?:\s|&#0*160;|&#x0*a0;|&nbsp;|\u00a0)*'
+    r'</p>'
+)
+
+
+def _normalise_blank_paragraphs(fragment):
+    return regex.sub(
+        _BLANK_PARAGRAPH_PATTERN,
+        '<br/>',
+        fragment,
+        flags=regex.IGNORECASE,
+    )
+
+
 def build_html(fragment, css=False):
-    fragment = regex.sub(r'<p([^>]*)></p>', r'<p\1>&#160;</p>', fragment)
+    fragment = _normalise_blank_paragraphs(fragment)
     css_link = ''
     if css:
         css_link = LINK_TEXT
