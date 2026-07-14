@@ -53,6 +53,9 @@ docximport/
 # Local web research cache
 .firecrawl/
 
+# Local CCG task metadata
+.ccg/
+
 # Zip files (plugin releases)
 *.zip
 *.tar.gz
