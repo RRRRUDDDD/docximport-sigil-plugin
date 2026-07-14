@@ -20,12 +20,16 @@ _normalise_blank_paragraphs = __import__(
 
 
 class BlankParagraphTests(unittest.TestCase):
-    def test_empty_paragraph_with_attributes_becomes_a_break(self):
+    def test_empty_paragraph_keeps_attributes_around_the_break(self):
         self.assertEqual(
-            '<br/>',
+            '<p style="font-size: 10.5pt"><br/></p>',
             _normalise_blank_paragraphs(
-                '<p style="font-size: 10.5pt"></p>'
+                '<p style="font-size: 10.5pt">&#160;</p>'
             ),
+        )
+        self.assertEqual(
+            '<p><br/></p>',
+            _normalise_blank_paragraphs('<p></p>'),
         )
 
     def test_whitespace_and_nbsp_only_paragraphs_become_breaks(self):
@@ -37,7 +41,7 @@ class BlankParagraphTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            '<br/><br/><br/><br/>',
+            '<p><br/></p><p><br/></p><p><br/></p><p><br/></p>',
             _normalise_blank_paragraphs(fragment),
         )
 

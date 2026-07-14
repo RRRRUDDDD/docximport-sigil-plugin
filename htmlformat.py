@@ -26,16 +26,16 @@ HTML = textwrap.dedent('''<?xml version="1.0" encoding="utf-8"?>
 LINK_TEXT = '<link href="stylesheet.css" type="text/css" rel="stylesheet"/>'
 
 _BLANK_PARAGRAPH_PATTERN = (
-    r'<p(?:\s[^>]*)?>'
+    r'(?P<opening><p(?:\s[^>]*)?>)'
     r'(?:\s|&#0*160;|&#x0*a0;|&nbsp;|\u00a0)*'
-    r'</p>'
+    r'(?P<closing></p>)'
 )
 
 
 def _normalise_blank_paragraphs(fragment):
     return regex.sub(
         _BLANK_PARAGRAPH_PATTERN,
-        '<br/>',
+        r'\g<opening><br/>\g<closing>',
         fragment,
         flags=regex.IGNORECASE,
     )
